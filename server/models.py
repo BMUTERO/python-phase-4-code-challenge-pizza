@@ -36,6 +36,10 @@ class Pizza(db.Model, SerializerMixin):
     ingredients = db.Column(db.String)
 
     # add relationship
+    # restaurant-restaurant pizzas relationship
+    # pizza-restaurant pizzas relationship
+    # restaurant pizzas-pizza relationship
+    
 
     # add serialization rules
 

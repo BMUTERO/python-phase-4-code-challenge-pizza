@@ -23,16 +23,66 @@ api = Api(app)
 def index():
     return "<h1>Code challenge</h1>"
 
+# --- Restaurants ---
 @app.route("/restaurants", methods=["GET"])
 def get_restaurants():
-    # Get all restaurants from the database
     restaurants = Restaurant.query.all()
-    
-    # Convert each restaurant object to a dictionary
-    restaurants_serialized = [r.to_dict() for r in restaurants]
-    
-    # Return JSON response with HTTP status 200
+    restaurants_serialized = [r.to_dict(only=("id", "name", "address")) for r in restaurants]
     return make_response(restaurants_serialized, 200)
+
+@app.route("/restaurants/<int:id>", methods=["GET"])
+def get_restaurant(id):
+    restaurant = Restaurant.query.get(id)
+    if not restaurant:
+        return make_response({"error": "Restaurant not found"}, 404)
+
+    restaurant_data = restaurant.to_dict()
+    restaurant_pizzas = []
+    for rp in restaurant.restaurant_pizzas:
+        rp_data = rp.to_dict()
+        rp_data["pizza"] = rp.pizza.to_dict()
+        restaurant_pizzas.append(rp_data)
+    restaurant_data["restaurant_pizzas"] = restaurant_pizzas
+    return make_response(restaurant_data, 200)
+
+@app.route("/restaurants/<int:id>", methods=["DELETE"])
+def delete_restaurant(id):
+    restaurant = Restaurant.query.get(id)
+    if not restaurant:
+        return make_response({"error": "Restaurant not found"}, 404)
+    
+    # Cascade delete restaurant pizzas
+    for rp in restaurant.restaurant_pizzas:
+        db.session.delete(rp)
+
+    db.session.delete(restaurant)
+    db.session.commit()
+    return make_response("", 204)
+
+# --- Pizzas ---
+@app.route("/pizzas", methods=["GET"])
+def get_pizzas():
+    pizzas = Pizza.query.all()
+    pizzas_serialized = [p.to_dict() for p in pizzas]
+    return make_response(pizzas_serialized, 200)
+
+# --- RestaurantPizzas ---
+@app.route("/restaurant_pizzas", methods=["POST"])
+def create_restaurant_pizza():
+    data = request.get_json()
+    try:
+        new_rp = RestaurantPizza(
+            price=data["price"],
+            pizza_id=data["pizza_id"],
+            restaurant_id=data["restaurant_id"]
+        )
+        db.session.add(new_rp)
+        db.session.commit()
+        return make_response(new_rp.to_dict(), 201)
+    except ValueError as e:
+        return make_response({"errors": [str(e)]}, 400)
+    except KeyError as e:
+        return make_response({"errors": [f"Missing {str(e)} key in request data"]}, 400)
 
 # --- Run server ---
 if __name__ == "__main__":
